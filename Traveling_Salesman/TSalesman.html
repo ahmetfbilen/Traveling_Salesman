@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Traveling Salesman Oyunu</title>
+    <style>
+        /* Sol üstten yeşilden sağ alta maviye kayan arka plan gradyenti */
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(to bottom right, #7628a7, #007bff);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        /* Birinci logo */
+        #logo {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 400px;
+            height: 300px;
+            z-index: 100;
+        }
+
+        /* İkinci logo */
+        #logo2 {
+            position: absolute;
+            top: 330px;
+            left: -80px;
+            width: 600px;
+            height: auto;
+            z-index: 100;
+        }
+
+        #game-container {
+            text-align: center;
+            margin-top: 40px;
+            border-radius: 10px;
+            border: 5px solid black;
+            background-color: aliceblue;
+            padding-bottom: 20px;
+        }
+
+        canvas {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #333;
+            display: block;
+            margin: 0 auto;
+            border-radius: 8px;
+        }
+
+        /* Bilgi kutusu */
+        #info-box {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            padding: 15px 25px;
+            margin-top: 15px;
+        }
+
+        #info-box p {
+            margin: 8px 0;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            color: #333;
+        }
+
+        /* Yeniden oyna butonu */
+        #resetBtn {
+            display: none;
+            margin-top: 10px;
+            padding: 8px 16px;
+            font-size: 14px;
+            border: none;
+            border-radius: 5px;
+            background-color: #0077cc;
+            color: #fff;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        #resetBtn:hover {
+            background-color: #005fa3;
+        }
+
+        /* Optimumu göster butonu (sağ alt köşe) */
+        #optimumBtn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 18px;
+            font-size: 14px;
+            border: none;
+            border-radius: 5px;
+            background-color: #28a745;
+            color: #fff;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            z-index: 200;
+            transition: background-color 0.2s;
+        }
+
+        #optimumBtn:hover {
+            background-color: #218838;
+        }
+
+        /* Optimum mesafe yazısı */
+        #optDist {
+            position: fixed;
+            bottom: 24px;
+            right: 160px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #fff;
+            z-index: 200;
+        }
+
+        /* Skorlar paneli */
+        #scores {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 160px;
+            font-family: sans-serif;
+            text-align: left;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 8px;
+            padding: 10px 15px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        #scores h3 {
+            margin: 0 0 8px 0;
+            font-size: 16px;
+            color: #0077cc;
+        }
+
+        #scores ol {
+            padding-left: 20px;
+            margin: 0;
+        }
+
+        #scores li {
+            margin-bottom: 4px;
+            color: #333;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Logolar -->
+    <img id="logo" src="logo.png" alt="Logo">
+    <img id="logo2" src="logo2.png" alt="Logo2">
+
+    <div id="game-container">
+        <canvas id="canvas" width="900" height="600"></canvas>
+        <div id="info-box">
+            <p>Adımlar: <span id="steps">0</span> / 20</p>
+            <p>Toplam Mesafe: <span id="totalDist">0</span></p>
+            <p id="message"></p>
+            <button id="resetBtn">Yeniden Oyna</button>
+        </div>
+    </div>
+
+    <div id="scores">
+        <h3>Skorlar</h3>
+        <ol id="scoreList"></ol>
+    </div>
+
+    <!-- Optimum yolu gösterecek buton ve mesafe etiketi -->
+    <button id="optimumBtn">Optimumu Göster</button>
+    <span id="optDist"></span>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const W = canvas.width, H = canvas.height, R = 12;
+
+        const mapImage = new Image();
+        mapImage.onload = draw;
+        mapImage.src = 'bos-turkiye-haritasi.jpg';
+
+        const points = [
+            { x: 300, y: 80 }, { x: 450, y: 200 }, { x: 225, y: 250 },
+            { x: 525, y: 350 }, { x: 750, y: 100 }, { x: 780, y: 250 },
+            { x: 490, y: 460 }, { x: 720, y: 370 }, { x: 600, y: 320 },
+            { x: 480, y: 300 }, { x: 200, y: 350 }, { x: 350, y: 420 },
+            { x: 650, y: 180 }, { x: 820, y: 220 }, { x: 350, y: 180 },
+            { x: 100, y: 200 }, { x: 850, y: 330 }, { x: 370, y: 300 },
+            { x: 400, y: 100 }, { x: 600, y: 120 }
+        ];
+
+        let path = [], totalDist = 0, scores = [], showOptimal = false;
+
+        // Sizden gelen en kısa rota
+        const optimalIndices = [
+            0, 18, 14, 17, 9, 1, 19, 12, 4, 13,
+            5, 16, 7, 8, 3, 6, 11, 10, 2, 15, 0
+        ];
+
+        function dist(a, b) {
+            return Math.hypot(a.x - b.x, a.y - b.y);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, W, H);
+            if (mapImage.complete) ctx.drawImage(mapImage, 0, 0, W, H);
+
+            // Kullanıcı rotası
+            ctx.strokeStyle = '#007'; ctx.lineWidth = 2;
+            ctx.fillStyle = '#000'; ctx.font = '12px sans-serif';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+            for (let i = 1; i < path.length; i++) {
+                const a = points[path[i - 1]], b = points[path[i]];
+                ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+                const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+                ctx.fillText(dist(a, b).toFixed(1), mx, my - 4);
+            }
+
+            // Noktalar
+            points.forEach((p, i) => {
+                ctx.beginPath(); ctx.arc(p.x, p.y, R, 0, 2 * Math.PI);
+                ctx.fillStyle = path.includes(i) ? '#f00' : '#555';
+                ctx.fill();
+                ctx.fillStyle = '#fff'; ctx.font = '14px sans-serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(i + 1, p.x, p.y);
+            });
+        }
+
+        function updateInfo() {
+            document.getElementById('steps').textContent = Math.max(0, path.length - 1);
+            document.getElementById('totalDist').textContent = totalDist.toFixed(1);
+        }
+
+        function renderScores() {
+            const list = document.getElementById('scoreList');
+            list.innerHTML = '';
+            scores.forEach((s, idx) => {
+                const li = document.createElement('li');
+                li.textContent = `#${idx + 1}: ${s}`;
+                list.appendChild(li);
+            });
+        }
+
+        function checkComplete() {
+            if (path.length === points.length + 1) {
+                document.getElementById('message').textContent =
+                    `🎉 Oyun Bitti! Toplam Mesafe: ${totalDist.toFixed(1)}`;
+                scores.push(totalDist.toFixed(1));
+                renderScores();
+                document.getElementById('resetBtn').style.display = 'inline-block';
+            }
+        }
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            path = []; totalDist = 0;
+            document.getElementById('message').textContent = '';
+            document.getElementById('resetBtn').style.display = 'none';
+            draw(); updateInfo();
+        });
+
+        canvas.addEventListener('click', e => {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+            for (let i = 0; i < points.length; i++) {
+                if (Math.hypot(mx - points[i].x, my - points[i].y) <= R + 2) {
+                    if (path.length === 0) {
+                        path.push(i);
+                    } else if (path.length <= points.length - 1 && !path.includes(i)) {
+                        totalDist += dist(points[path.at(-1)], points[i]);
+                        path.push(i);
+                    } else if (path.length === points.length && i === path[0]) {
+                        totalDist += dist(points[path.at(-1)], points[0]);
+                        path.push(0);
+                    }
+                    draw(); updateInfo(); checkComplete();
+                    break;
+                }
+            }
+        });
+
+        // Optimum rotayı çiz
+        function drawOptimalRoute() {
+            ctx.save();
+            ctx.strokeStyle = 'lime'; ctx.lineWidth = 3;
+            for (let i = 1; i < optimalIndices.length; i++) {
+                const a = points[optimalIndices[i - 1]],
+                    b = points[optimalIndices[i]];
+                ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        // Optimum mesafeyi hesapla
+        function computeOptimalDistance() {
+            let d = 0;
+            for (let i = 1; i < optimalIndices.length; i++) {
+                d += dist(points[optimalIndices[i - 1]], points[optimalIndices[i]]);
+            }
+            return d;
+        }
+
+        // Optimum buton mantığı
+        document.getElementById('optimumBtn').addEventListener('click', () => {
+            const btn = document.getElementById('optimumBtn');
+            const disp = document.getElementById('optDist');
+            if (!showOptimal) {
+                // temizle
+                path = []; totalDist = 0;
+                document.getElementById('resetBtn').style.display = 'none';
+                document.getElementById('message').textContent = '';
+                draw();
+                // çiz ve mesafeyi göster
+                drawOptimalRoute();
+                disp.textContent = computeOptimalDistance().toFixed(1);
+                showOptimal = true;
+                btn.textContent = 'Optimumu Kapat';
+            } else {
+                // temizle
+                path = []; totalDist = 0;
+                document.getElementById('resetBtn').style.display = 'none';
+                document.getElementById('message').textContent = '';
+                draw(); updateInfo();
+                disp.textContent = '';
+                showOptimal = false;
+                btn.textContent = 'Optimumu Göster';
+            }
+        });
+
+        // İlk çizim
+        draw();
+        updateInfo();
+    </script>
+</body>
+
+</html>
